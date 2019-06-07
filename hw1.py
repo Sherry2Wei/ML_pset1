@@ -48,24 +48,18 @@ for lag_month in range(6):
 # Lasso regression
 # seperating the training set and the testing set
 # Given that the msf start at 1989, thus the training set is began from 1989-01-31 to 2008-01-31
+# and end with 2012-12-31
 training_x = monthly_ff5.query("date >= '1989' & date <= '2008-01-31'")[['mkt_rf', 'smb', 'hml', 'rmw', 'cma']]
 training_y = msf.query("date <= '2008-01-31' & permno == '10001'").ret
-testing_x = monthly_ff5.query("date > '2008-01-31' ")[['mkt_rf', 'smb', 'hml', 'rmw', 'cma']]
-testing_y = 
+testing_x = monthly_ff5.query("date > '2008-01-31' & date <= '2012-12-31' ")[['mkt_rf', 'smb', 'hml', 'rmw', 'cma']]
+testing_y = msf.query("date > '2008-01-31' & permno == '10001'").ret
 alphas = np.logspace(-4, -1, 10)
 lasso_reg = linear_model.Lasso()
 # try to find the best r square by trying different alpha
 r_square_list = [lasso_reg.set_params(alpha=alpha).fit(training_x, training_y).score(testing_x, testing_y)
                  for alpha in alphas]
-
-
-scores = [regr.set_params(alpha=alpha)
-...               .fit(diabetes_X_train, diabetes_y_train)
-...               .score(diabetes_X_test, diabetes_y_test)
-...           for alpha in alphas]
-best_alpha = alphas[scores.index(max(scores))]
->>> regr.alpha = best_alpha
->>> regr.fit(diabetes_X_train, diabetes_y_train)
+lasso_reg.aplha = alphas[r_square_list.index(max(r_square_list))]
+lasso_reg.predict(testing_x)
 
 
 
