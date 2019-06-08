@@ -3,8 +3,7 @@ import pandas as pd
 import os
 import datetime
 from sklearn import linear_model
-os.chdir(r"c:\Users\ChonWai\Desktop\machine learning\data")
-
+os.chdir(r"D:\\03lecture\\07 machine learning")
 
 def end_of_month(any_day):
     next_month = any_day.replace(day=28) + datetime.timedelta(days=4)  # this will never fail
