@@ -3,7 +3,9 @@ import pandas as pd
 import os
 import datetime
 from sklearn import linear_model
-os.chdir(r"D:\\03lecture\\07 machine learning")
+os.chdir(r"D:\03lecture\07 machine learning\Pset1\data")
+import warnings
+warnings.filterwarnings('ignore')
 
 def end_of_month(any_day):
     next_month = any_day.replace(day=28) + datetime.timedelta(days=4)  # this will never fail
@@ -48,20 +50,40 @@ for lag_month in range(6):
 # seperating the training set and the testing set
 # Given that the msf start at 1989, thus the training set is began from 1989-01-31 to 2008-01-31
 # and end with 2012-12-31
-training_x = monthly_ff5.query("date >= '1989' & date <= '2008-01-31'")[['mkt_rf', 'smb', 'hml', 'rmw', 'cma']]
+
+factors = all_factor.columns[4:].tolist()
+factors.remove("year")
+factors.remove("month")
+training_x = all_factor.query("date >= '1989' & date <= '2008-01-31'")[factors]
 training_y = msf.query("date <= '2008-01-31' & permno == '10001'").ret
-testing_x = monthly_ff5.query("date > '2008-01-31' & date <= '2012-12-31' ")[['mkt_rf', 'smb', 'hml', 'rmw', 'cma']]
-testing_y = msf.query("date > '2008-01-31' & permno == '10001'").ret
-alphas = np.logspace(-4, -1, 10)
-lasso_reg = linear_model.Lasso()
-# try to find the best r square by trying different alpha
-r_square_list = [lasso_reg.set_params(alpha=alpha).fit(training_x, training_y).score(testing_x, testing_y)
-                 for alpha in alphas]
-lasso_reg.aplha = alphas[r_square_list.index(max(r_square_list))]
-lasso_reg.predict(testing_x)
+
+def lasso_reg(stock_id,day):
+    training_x = all_factor.query("date >= '1989' & date <= '2008-01-31'")[factors]
+    training_y = msf.query("date <= '2008-01-31' & permno == @stock_id").ret ## 以10001为例
+    day =  msf.query("date > '2008-01-31' & permno == @stock_id ").date.tolist()[0]
+    testing_x = all_factor.query("date == @day ")[factors]
+    testing_y = msf.query("date == @day & permno == @stock_id").ret
+    alphas = np.logspace(-4, -1, 10)
+    lasso_reg = linear_model.Lasso()
+    # try to find the best r square by trying different alpha
+    r_square_list = [lasso_reg.set_params(alpha=alpha).fit(training_x, training_y).score(testing_x, testing_y)
+                     for alpha in alphas]
+    lasso_reg.aplha = alphas[r_square_list.index(max(r_square_list))]
+    return  np.array([stock_id] + [day] + lasso_reg.predict(testing_x).tolist())
+
+lasso_reg('10001','2008-02-29')
+
+from progressbar import *
+progress = ProgressBar()
 
 
+lasso_results = []
+for stock_id in progress(list(set(msf.permno.astype('str')))):
+    for day in progress(list(msf.date.astype('str'))):
+        result = lasso_reg(stock_id,day)
+        lasso_results.append(result)
 
+lasso_results
 
 
 
