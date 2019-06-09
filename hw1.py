@@ -6,6 +6,9 @@ from sklearn import linear_model
 import time
 from multiprocessing import Pool
 from functools import partial
+from sklearn.metrics import mean_squared_error
+import matplotlib.pyplot as plt
+from collections import Counter
 os.chdir(r"c:\Users\ChonWai\Desktop\machine learning\data")
 
 
@@ -33,7 +36,10 @@ def lasso(permno, msf, x_train, x_test):
                      for alpha in alphas]
     lasso_reg.set_params(alpha=alphas[r_square_list.index(max(r_square_list))])
     lasso_reg.fit(x_train, training_y)
-    return {str(permno): [lasso_reg.predict(x_test), lasso_reg.alpha, lasso_reg.coef_]}
+    in_sample_mse = mean_squared_error(training_y, lasso_reg.predict(x_train))
+    out_sample_mse = mean_squared_error(testing_y, lasso_reg.predict(x_test))
+    return {"permno": str(permno), "pred_y": lasso_reg.predict(x_test), "alpha": lasso_reg.alpha,
+            "coef": lasso_reg.coef_, "in_sample_mse": in_sample_mse, "out_sample_mse": out_sample_mse}
 
 
 if __name__ == '__main__':
@@ -83,8 +89,62 @@ if __name__ == '__main__':
     testing_x = all_factor.dropna().query("date > '2008-01-31' & date <= '2012-12-31' ")[all_factor.columns[1:]]
     permno_list = list(set(msf.permno))
     p = Pool(processes=7)
-    result = list(p.map(partial(lasso, msf=msf, x_train=training_x, x_test=testing_x), permno_list))
-    print(result)
+    result = list(map(partial(lasso, msf=msf, x_train=training_x, x_test=testing_x), permno_list))
+    p.close()
+    pred_y_list = []
+    alpha_list = []
+    coef_list = []
+    in_sample_error_list = []
+    out_sample_error_list = []
+    for dictionary in result:
+        pred_y_list.append(dictionary["pred_y"].tolist())
+        alpha_list.append(dictionary["alpha"])
+        coef_list.append(dictionary["coef"].tolist())
+        in_sample_error_list.append(dictionary["in_sample_mse"])
+        out_sample_error_list.append(dictionary["out_sample_mse"])
+    x = [str(permno) for permno in permno_list]
+    y_in_sample = in_sample_error_list
+    y_out_sample = out_sample_error_list
+    ax1 = plt.subplot(1, 1, 1)
+    postion_x = np.arange(len(permno_list))
+    width = 0.3
+    plt.xticks(postion_x + width / 2, x, rotation='vertical')
+    in_sample_bar = ax1.bar(postion_x, y_in_sample, width=0.3, color="blue")
+    ax2 = ax1.twinx()
+    out_sample_bar = ax2.bar(postion_x + 0.3, y_out_sample, width=0.3, color="red")
+    plt.legend([in_sample_bar, out_sample_bar], ["In Sample MSE", "Out Sample MSE"])
+    plt.ylabel("MSE", fontdict={"fontweight": "bold"})
+    plt.xlabel("Permno", fontdict={"fontweight": "bold"})
+    plt.title("In Sample and out sample MSE comparsion",
+              fontdict={"fontstyle": "italic", "fontweight": "bold"})
+    plt.show()
+    plt.close()
+    # The in sample and out of sample prediction error
+    print("average in sample error of all assets:")
+    print(np.average(y_in_sample))
+    print("average out sample error of all assets:")
+    print(np.average(y_out_sample))
+    # plot the factors selection frequency for all sample
+    factors = []
+    for permno_coef in coef_list:
+        permno_factor = [all_factor.columns[1:][permno_coef.index(coef)] for coef in permno_coef if coef > 0]
+        factors.extend(permno_factor)
+    factors_freq = Counter(factors)
+    factors_freq = pd.Series(factors_freq)
+    x_factor = factors_freq.index.tolist()
+    y_factor_freq = factors_freq.values.tolist()
+    y_factor_freq.sort(reverse=True)
+    postion_x_factor = np.arange(len(x_factor))
+    width = 0.3
+    plt.xticks(postion_x_factor, x_factor, rotation='vertical')
+    freq_bar = plt.bar(postion_x_factor, y_factor_freq, width=0.3, color="blue")
+    plt.legend(freq_bar, ["Factors Frequency"])
+    plt.ylabel("Frequency", fontdict={"fontweight": "bold"})
+    plt.xlabel("Factors", fontdict={"fontweight": "bold"})
+    plt.title("Factors Selection Frequency ",
+              fontdict={"fontstyle": "italic", "fontweight": "bold"})
+    plt.show()
+    plt.close()
     print("--- %s seconds ---" % (time.time() - start_time))
 
 
